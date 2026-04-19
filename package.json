@@ -1,0 +1,32 @@
+{
+  "name": "git-newspaper",
+  "version": "0.1.1",
+  "description": "Generate a beautifully typeset newspaper front page from your git repository history",
+  "type": "module",
+  "bin": {
+    "git-newspaper": "./bin/cli.js"
+  },
+  "main": "./src/index.js",
+  "scripts": {
+    "start": "node bin/cli.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "open": "^10.1.0",
+    "simple-git": "^3.27.0"
+  },
+  "keywords": [
+    "git",
+    "newspaper",
+    "cli",
+    "visualization",
+    "history"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
+  }
+}
