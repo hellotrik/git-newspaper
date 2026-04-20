@@ -14,7 +14,7 @@ program
   .option('--since <date>',      'only include commits since this date (e.g. "2 weeks ago", "2024-01-01")')
   .option('--limit <n>',         'max commits to analyse', '500')
   .option('--format <fmt>',      'output format: html or png', 'html')
-  .option('--locale <code>',     'output language: en or zh (default: en)', 'en')
+  .option('--locale <code>',     'output language: en or zh (default: zh)', 'zh')
   .option('--no-open',           'do not open the output file after generating')
   .parse()
 

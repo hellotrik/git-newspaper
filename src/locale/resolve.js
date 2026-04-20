@@ -9,7 +9,7 @@ export const SUPPORTED = /** @type {const} */ (['en', 'zh'])
  * @returns {LocaleKey}
  */
 export function resolveLocale(input) {
-  if (!input || typeof input !== 'string') return 'en'
+  if (!input || typeof input !== 'string') return 'zh'
   const n = input.trim().toLowerCase().replace(/_/g, '-')
   if (n === 'zh' || n === 'zh-cn' || n === 'zh-hans' || n === 'cn') return 'zh'
   return 'en'
