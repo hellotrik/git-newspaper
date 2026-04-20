@@ -1,3 +1,6 @@
+import { intlLocaleFor } from './locale/resolve.js'
+import { INLINE_FONTS } from './fonts.js'
+
 const ARCHETYPE_DINGBAT = {
   REVERT_CRISIS:    '\u2020',  // †  Dagger
   SOLO_MARATHON:    '\u2042',  // ⁂  Asterism
@@ -10,14 +13,14 @@ const ARCHETYPE_DINGBAT = {
   BALANCED:         '\u2720',  // ✠  Maltese cross
 }
 
-function renderTimeline(timeline) {
+function renderTimeline(timeline, intlLocale) {
   if (!timeline?.points?.length) return ''
-  const { points, granularity, oldest, newest, peakIdx, peakCount } = timeline
+  const { points, timelineLabel, peakLabel, oldest, newest, peakIdx, peakCount } = timeline
 
   const W = 1000, H = 56, PAD_Y = 6
   const n    = points.length
   const max  = Math.max(...points.map(p => p.count), 1)
-  const fmt  = d => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  const fmt  = d => d.toLocaleDateString(intlLocale, { month: 'short', year: 'numeric' })
 
   const xOf  = i => Math.round((i / Math.max(n - 1, 1)) * W)
   const yOf  = v => Math.round(H - PAD_Y - (v / max) * (H - PAD_Y * 2))
@@ -45,7 +48,7 @@ function renderTimeline(timeline) {
 
   return `
 <div class="timeline-wrap">
-  <div class="timeline-label">Commit Activity — ${granularity.charAt(0).toUpperCase() + granularity.slice(1)}</div>
+  <div class="timeline-label">${timelineLabel}</div>
   <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible">
     <defs>
       <linearGradient id="tl-fill" x1="0" y1="0" x2="0" y2="1">
@@ -62,13 +65,13 @@ function renderTimeline(timeline) {
   </svg>
   <div class="timeline-axis">
     <span>${fmt(oldest)}</span>
-    <span class="timeline-peak">peak: ${peakCount} commit${peakCount !== 1 ? 's' : ''}</span>
+    <span class="timeline-peak">${peakLabel}</span>
     <span>${fmt(newest)}</span>
   </div>
 </div>`
 }
 
-function renderTypeChart(typeBreakdown) {
+function renderTypeChart(typeBreakdown, locale) {
   if (!typeBreakdown?.length) return ''
   const top = typeBreakdown.slice(0, 6)
   const max = top[0][1]
@@ -80,8 +83,9 @@ function renderTypeChart(typeBreakdown) {
     const barW = Math.round((count / max) * barAreaW)
     const y = i * rowH
     const midY = y + rowH * 0.72
+    const label = locale === 'zh' ? type : type.toUpperCase()
     return `
-    <text x="0"          y="${midY}" font-family="Cinzel,serif" font-size="6.5" fill="#6b5a42" letter-spacing="0.8">${type.toUpperCase()}</text>
+    <text x="0"          y="${midY}" font-family="Cinzel,serif" font-size="6.5" fill="#6b5a42" letter-spacing="0.8">${label}</text>
     <rect x="${labelW}"  y="${y + 2}" width="${barW}" height="${rowH - 5}" fill="#1a1209" opacity="0.72" rx="1"/>
     <text x="${labelW + barW + 4}" y="${midY}" font-family="Cinzel,serif" font-size="6.5" fill="#3a2c1a">${count}</text>`
   }).join('')
@@ -89,15 +93,23 @@ function renderTypeChart(typeBreakdown) {
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block">${rows}</svg>`
 }
 
-import { INLINE_FONTS } from './fonts.js'
-
 function getLayout(archetype) {
   if (['REVERT_CRISIS', 'BUGFIX_CRISIS'].includes(archetype))         return 'stack'
   if (['GHOST_TOWN', 'DEPENDENCY_CHURN'].includes(archetype))         return 'sparse'
   return 'hero'
 }
 
-export function renderNewspaper({ masthead, headline, lead, weather, obituaries, opinion, stats, classifieds, bylineBar, charts, archetype }) {
+export function renderNewspaper(
+  { masthead, headline, lead, weather, obituaries, opinion, stats, classifieds, bylineBar, charts, archetype },
+  { locale, messages }
+) {
+  const t = messages.template
+  const intlLocale = intlLocaleFor(locale)
+  const htmlLang = locale === 'zh' ? 'zh-CN' : 'en'
+  const bodyFont = locale === 'zh'
+    ? "'Noto Serif SC', 'Source Han Serif CN', 'IM Fell English', 'Georgia', serif"
+    : "'IM Fell English', 'Georgia', serif"
+
   const layout = getLayout(archetype)
   const obitsHtml = obituaries.length
     ? obituaries.map(o => `
@@ -106,23 +118,23 @@ export function renderNewspaper({ masthead, headline, lead, weather, obituaries,
           <div class="obit-path">${o.path}</div>
           <p class="obit-text">${o.epitaph}</p>
         </div>`).join('<div class="obit-divider">* * *</div>')
-    : `<p class="empty-note">No files perished during this period. A season of mercy.</p>`
+    : `<p class="empty-note">${t.emptyObits}</p>`
 
   const statsRows = [
-    ['Commits Examined',  stats.totalCommits.toLocaleString()],
-    ['Lines Introduced',  stats.totalInsertions.toLocaleString()],
-    ['Lines Expunged',    stats.totalDeletions.toLocaleString()],
-    ['Avg. Change',       stats.avgPerCommit.toLocaleString() + ' lines'],
+    [t.statsCommitsExamined, stats.totalCommits.toLocaleString(intlLocale)],
+    [t.statsLinesIntroduced, stats.totalInsertions.toLocaleString(intlLocale)],
+    [t.statsLinesExpunged, stats.totalDeletions.toLocaleString(intlLocale)],
+    [t.statsAvgChange, stats.avgPerCommit.toLocaleString(intlLocale) + ' ' + t.statsLinesUnit],
   ]
 
   const maxAuthorCount = stats.topAuthors[0]?.[1] ?? 1
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${htmlLang}">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>The Git Gazette — ${masthead.repo}</title>
+<title>${t.htmlTitleSuffix} — ${masthead.repo}</title>
 <style>${INLINE_FONTS}</style>
 <style>
 
@@ -153,7 +165,7 @@ body {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E"),
     repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(0,0,0,0.018) 23px, rgba(0,0,0,0.018) 24px);
   color:       var(--ink);
-  font-family: 'IM Fell English', 'Georgia', serif;
+  font-family: ${bodyFont};
   font-size:   15.5px;
   line-height: 1.6;
   max-width:   1180px;
@@ -733,13 +745,13 @@ body {
 </head>
 <body data-layout="${layout}">
 
-<div class="crisis-band">Breaking — ${masthead.edition}</div>
+<div class="crisis-band">${t.crisisBreaking} — ${masthead.edition}</div>
 
 <!-- ══ MASTHEAD ══════════════════════════════════════════════════════════ -->
 <header class="masthead">
   <div class="mast-topbar">
-    <span>Established by <code>git init</code></span>
-    <span>Vol. I &nbsp;·&nbsp; No. 1 &nbsp;·&nbsp; ${masthead.edition}</span>
+    <span>${t.mastEstablished} <code>git init</code></span>
+    <span>${t.mastVol} &nbsp;·&nbsp; ${t.mastNo} &nbsp;·&nbsp; ${masthead.edition}</span>
     <span>${masthead.date}</span>
   </div>
 
@@ -747,7 +759,7 @@ body {
   <div style="height:3px"></div>
   <hr class="rule-single" />
 
-  <div class="mast-title">The Git Gazette</div>
+  <div class="mast-title">${t.mastTitle}</div>
   <div class="mast-repo">${masthead.repo}</div>
   <div class="mast-tagline">${masthead.tagline}</div>
 
@@ -756,12 +768,12 @@ body {
   <hr class="rule-thick" />
 
   <nav class="section-nav">
-    <span>Front Page</span>
-    <span>Meteorology</span>
-    <span>Obituaries</span>
-    <span>Opinion</span>
-    <span>Classifieds</span>
-    <span>Vital Statistics</span>
+    <span>${t.navFrontPage}</span>
+    <span>${t.navMeteorology}</span>
+    <span>${t.navObituaries}</span>
+    <span>${t.navOpinion}</span>
+    <span>${t.navClassifieds}</span>
+    <span>${t.navVitalStats}</span>
   </nav>
   <hr class="rule-double" />
 </header>
@@ -771,7 +783,7 @@ body {
 
   <!-- STATS SIDEBAR -->
   <aside class="col-stats">
-    <div class="sec-head">Vital Statistics</div>
+    <div class="sec-head">${t.vitalStats}</div>
 
     <div class="stat-block mt4">
       ${statsRows.map(([label, val]) => `
@@ -779,35 +791,35 @@ body {
     </div>
 
     <hr class="rule-thin" />
-    <div class="sec-head mt8">Contributors</div>
+    <div class="sec-head mt8">${t.contributors}</div>
     <div class="mt4">
       ${stats.topAuthors.map(([name, count]) => {
         const pct = Math.round((count / maxAuthorCount) * 100)
         return `
       <div class="author-item">
         <div class="author-name">${name}</div>
-        <div class="author-meta">${count} commit${count !== 1 ? 's' : ''}</div>
+        <div class="author-meta">${t.authorCommits(count)}</div>
         <div class="author-bar-wrap"><div class="author-bar-fill" style="width:${pct}%"></div></div>
       </div>`}).join('')}
     </div>
 
     ${stats.mostChurned.length ? `
     <hr class="rule-thin mt8" />
-    <div class="sec-head mt8">Most Vexed</div>
+    <div class="sec-head mt8">${t.mostVexed}</div>
     <div class="mt4">
       ${stats.mostChurned.map(({ file, churn }) => {
         const name = file.split(/[/\\]/).pop()
         return `
       <div class="author-item">
         <div class="author-name" style="word-break:break-all;font-size:10px">${name}</div>
-        <div class="author-meta">${churn} changes</div>
+        <div class="author-meta">${t.fileChanges(churn)}</div>
       </div>`}).join('')}
     </div>` : ''}
 
     ${stats.typeBreakdown.length ? `
     <hr class="rule-thin mt8" />
-    <div class="sec-head mt8">Commit Types</div>
-    <div class="mt4">${renderTypeChart(stats.typeBreakdown)}</div>` : ''}
+    <div class="sec-head mt8">${t.commitTypes}</div>
+    <div class="mt4">${renderTypeChart(stats.typeBreakdown, locale)}</div>` : ''}
 
   </aside>
 
@@ -817,7 +829,7 @@ body {
     <h1 class="hed">${headline.headline}</h1>
     <hr class="rule-deck" />
     <p class="deck mt4">${headline.deck}</p>
-    <div class="byline-line mb8">By ${headline.byline} &nbsp;·&nbsp; ${headline.date} &nbsp;·&nbsp; commit ${headline.hash}</div>
+    <div class="byline-line mb8">${t.bylinePrefix} ${headline.byline} &nbsp;·&nbsp; ${headline.date} &nbsp;·&nbsp; ${t.bylineCommitWord} ${headline.hash}</div>
     <hr class="rule-single mb8" />
     <div class="lead-body">
       ${lead.paragraphs.map(p => `<p>${p}</p>`).join('\n      ')}
@@ -826,16 +838,16 @@ body {
 
   <!-- WEATHER + OBITUARIES -->
   <aside class="col-right">
-    <div class="sec-head">Meteorological Report</div>
+    <div class="sec-head">${t.meteorologicalReport}</div>
     <div class="weather-block mt8">
       <div class="weather-cond">${weather.condition}</div>
-      <div class="weather-temp">${weather.temp}°F &nbsp;·&nbsp; Commit Climate</div>
+      <div class="weather-temp">${weather.temp}°F &nbsp;·&nbsp; ${t.weatherClimate}</div>
       <p class="weather-text mt4">${weather.forecast}</p>
     </div>
 
     <hr class="rule-single mb8 mt8" />
 
-    <div class="sec-head">Obituaries</div>
+    <div class="sec-head">${t.obituaries}</div>
     <div class="mt8">
       ${obitsHtml}
     </div>
@@ -845,7 +857,7 @@ body {
 <!-- ══ SECTION BREAK ══════════════════════════════════════════════════ -->
 <div class="mt10"></div>
 <hr class="rule-thick" />
-${renderTimeline(charts?.timeline)}
+${renderTimeline(charts?.timeline, intlLocale)}
 <hr class="rule-thick" />
 <hr class="rule-single" />
 
@@ -855,22 +867,22 @@ ${renderTimeline(charts?.timeline)}
   <!-- OPINION COLUMN -->
   ${opinion ? `
   <section class="col-opinion">
-    <div class="opinion-eyebrow">Opinion &amp; Commentary</div>
+    <div class="opinion-eyebrow">${t.opinionEyebrow}</div>
     <h2 class="opinion-hed">${opinion.title}</h2>
     <div class="opinion-sub">${opinion.subtitle}</div>
     <hr class="rule-deck mb8" />
     <div class="opinion-body">
       ${opinion.body.map((p, i) =>
         i === 1
-          ? `<p class="pull-quote">"${p.slice(0, 90).trim()}…"</p><p>${p}</p>`
+          ? `<p class="pull-quote">"${p.slice(0, 90).trim()}${t.ellipsis}"</p><p>${p}</p>`
           : `<p>${p}</p>`
       ).join('\n      ')}
     </div>
-  </section>` : `<section class="col-opinion"><p class="empty-note">No opinion submitted this edition.</p></section>`}
+  </section>` : `<section class="col-opinion"><p class="empty-note">${t.noOpinion}</p></section>`}
 
   <!-- CLASSIFIEDS -->
   <section class="col-classif">
-    <div class="sec-head">Classified Notices</div>
+    <div class="sec-head">${t.classifiedNotices}</div>
     <div class="classif-grid mt8">
       ${classifieds.map(ad => `
       <div>
@@ -897,8 +909,8 @@ ${renderTimeline(charts?.timeline)}
 
 <footer class="footer mt8">
   <div>${bylineBar.contributors.map(c => `${c.name} (${c.count})`).join(' &nbsp;·&nbsp; ')}</div>
-  <div>${bylineBar.totalCommits} commits examined &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}</div>
-  <div>git-newspaper &nbsp;·&nbsp; npx git-newspaper</div>
+  <div>${bylineBar.totalCommits} ${messages.charts.footerExamined} &nbsp;·&nbsp; ${messages.charts.footerGenerated} ${new Date().toLocaleDateString(intlLocale, { year:'numeric', month:'long', day:'numeric' })}</div>
+  <div>git-newspaper &nbsp;·&nbsp; ${t.footerNpx}</div>
 </footer>
 
 </body>

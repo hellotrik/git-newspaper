@@ -3,6 +3,7 @@ import { program } from 'commander'
 import { writeFileSync } from 'fs'
 import { resolve } from 'path'
 import { generate } from '../src/index.js'
+import { getMessages, resolveLocale } from '../src/locale/index.js'
 
 program
   .name('git-newspaper')
@@ -13,6 +14,7 @@ program
   .option('--since <date>',      'only include commits since this date (e.g. "2 weeks ago", "2024-01-01")')
   .option('--limit <n>',         'max commits to analyse', '500')
   .option('--format <fmt>',      'output format: html or png', 'html')
+  .option('--locale <code>',     'output language: en or zh (default: en)', 'en')
   .option('--no-open',           'do not open the output file after generating')
   .parse()
 
@@ -20,35 +22,38 @@ const opts = program.opts()
 
 ;(async () => {
   const repoPath = resolve(opts.repo)
-  const limit    = parseInt(opts.limit, 10)
-  const format   = opts.format.toLowerCase()
+  const limit = parseInt(opts.limit, 10)
+  const format = opts.format.toLowerCase()
+  const locale = resolveLocale(opts.locale)
+  const cli = getMessages(locale).cli
 
-  const outFile  = resolve(
+  const outFile = resolve(
     opts.output === 'newspaper.html' && format === 'png'
       ? 'newspaper.png'
       : opts.output
   )
 
-  console.log(`\n  git-newspaper\n`)
-  console.log(`  Repository : ${repoPath}`)
-  if (opts.since) console.log(`  Since      : ${opts.since}`)
-  console.log(`  Limit      : ${limit} commits`)
-  console.log(`  Format     : ${format}`)
-  console.log(`  Output     : ${outFile}\n`)
+  console.log(`\n  ${cli.banner}\n`)
+  console.log(`  ${cli.repository} : ${repoPath}`)
+  if (opts.since) console.log(`  ${cli.since}      : ${opts.since}`)
+  console.log(`  ${cli.limit}      : ${limit} ${cli.commits}`)
+  console.log(`  ${cli.format}     : ${format}`)
+  console.log(`  ${cli.localeLabel}    : ${locale}`)
+  console.log(`  ${cli.output}     : ${outFile}\n`)
 
   try {
-    const { html, data, hitLimit } = await generate({ repoPath, since: opts.since, limit })
+    const { html, data, hitLimit } = await generate({ repoPath, since: opts.since, limit, locale })
 
-    console.log(`✓  Analysed ${data.totalCommits} commit${data.totalCommits !== 1 ? 's' : ''} across ${Object.keys(data.allAuthors).length} contributor(s)`)
-    if (hitLimit) console.log(`   (showing most recent ${limit} commits — use --limit to adjust)`)
+    console.log(`✓  ${cli.analysed(data.totalCommits, Object.keys(data.allAuthors).length)}`)
+    if (hitLimit) console.log(`   ${cli.hitLimit(limit)}`)
 
     if (format === 'png') {
       let chromium, playwright
       try {
         playwright = await import('playwright')
-        chromium   = playwright.chromium
+        chromium = playwright.chromium
       } catch {
-        console.error(`\n✗  PNG export requires playwright: npm install -D playwright && npx playwright install chromium\n`)
+        console.error(`\n✗  ${cli.pngPlaywright}\n`)
         process.exit(1)
       }
 
@@ -56,7 +61,7 @@ const opts = program.opts()
       writeFileSync(tmpHtml, html, 'utf8')
 
       const browser = await chromium.launch()
-      const page    = await browser.newPage()
+      const page = await browser.newPage()
       await page.setViewportSize({ width: 1280, height: 900 })
       await page.goto(`file:///${tmpHtml.replace(/\\/g, '/')}`)
       await page.waitForLoadState('networkidle')
@@ -66,21 +71,21 @@ const opts = program.opts()
       const { unlinkSync } = await import('fs')
       unlinkSync(tmpHtml)
 
-      console.log(`✓  Screenshot saved to ${outFile}`)
+      console.log(`✓  ${cli.screenshotSaved(outFile)}`)
     } else {
       writeFileSync(outFile, html, 'utf8')
-      console.log(`✓  Newspaper written to ${outFile}`)
+      console.log(`✓  ${cli.newspaperWritten(outFile)}`)
     }
 
     if (opts.open) {
       const { default: open } = await import('open')
       await open(outFile)
-      console.log(`✓  Opened`)
+      console.log(`✓  ${cli.opened}`)
     }
 
-    console.log(`\n   Share it, print it, frame it.\n`)
+    console.log(`\n   ${cli.tagline}\n`)
   } catch (err) {
-    console.error(`\n✗  Error: ${err.message}\n`)
+    console.error(`\n✗  ${cli.errorPrefix}: ${err.message}\n`)
     process.exit(1)
   }
 })()

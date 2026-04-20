@@ -44,6 +44,7 @@ export function detectArchetype(data) {
   return ARCHETYPES.BALANCED
 }
 
+/** Edition titles for display come from i18n (`src/locale/`); `label` kept for reference / tooling. */
 export const ARCHETYPE_META = {
   REVERT_CRISIS:    { tone: 'scandal',       label: 'CRISIS EDITION',         layout: 'stack'  },
   SOLO_MARATHON:    { tone: 'admiring',      label: 'PROFILE EDITION',        layout: 'hero'   },

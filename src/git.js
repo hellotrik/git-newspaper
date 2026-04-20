@@ -1,11 +1,20 @@
 import simpleGit from 'simple-git'
 import path from 'path'
 
-export async function collectGitData(repoPath, { since, limit = 500 } = {}) {
+/**
+ * @param {string} repoPath
+ * @param {{ since?: string, limit?: number, errors?: { notRepo: (p: string) => string, noCommits: string } }} [opts]
+ */
+export async function collectGitData(repoPath, { since, limit = 500, errors } = {}) {
+  const err = errors ?? {
+    notRepo: (p) => `Not a git repository: ${p}`,
+    noCommits: 'No commits found in the given range.',
+  }
+
   const git = simpleGit(repoPath)
 
   const isRepo = await git.checkIsRepo().catch(() => false)
-  if (!isRepo) throw new Error(`Not a git repository: ${repoPath}`)
+  if (!isRepo) throw new Error(err.notRepo(repoPath))
 
   const logArgs = ['--stat', '--format=%H|%an|%ae|%at|%s', '-n', String(limit)]
   if (since) logArgs.push(`--since=${since}`)
@@ -17,7 +26,7 @@ export async function collectGitData(repoPath, { since, limit = 500 } = {}) {
   ])
 
   const commits = parseStatLog(rawLog)
-  if (!commits.length) throw new Error('No commits found in the given range.')
+  if (!commits.length) throw new Error(err.noCommits)
 
   const remote = remotes[0]?.refs?.fetch ?? null
 
@@ -27,13 +36,13 @@ export async function collectGitData(repoPath, { since, limit = 500 } = {}) {
   }
 
   const deletedFiles = []
-  const addedFiles   = []
+  const addedFiles = []
 
   for (const c of commits) {
     for (const f of c.files) {
       if (isGenerated(f.name)) continue
       if (f.deletions > 0 && f.insertions === 0) deletedFiles.push({ file: f.name, commit: c })
-      if (f.insertions > 0 && f.deletions === 0)  addedFiles.push({ file: f.name, commit: c })
+      if (f.insertions > 0 && f.deletions === 0) addedFiles.push({ file: f.name, commit: c })
     }
   }
 
@@ -52,10 +61,10 @@ export async function collectGitData(repoPath, { since, limit = 500 } = {}) {
   const biggestCommit = [...commits].sort((a, b) => b.totalChanged - a.totalChanged)[0]
 
   const firstCommit = commits[commits.length - 1]
-  const lastCommit  = commits[0]
+  const lastCommit = commits[0]
 
   const totalInsertions = commits.reduce((s, c) => s + c.insertions, 0)
-  const totalDeletions  = commits.reduce((s, c) => s + c.deletions, 0)
+  const totalDeletions = commits.reduce((s, c) => s + c.deletions, 0)
 
   const repoName = path.basename(repoPath)
 
@@ -74,7 +83,7 @@ export async function collectGitData(repoPath, { since, limit = 500 } = {}) {
     allAuthors,
     topAuthors: Object.entries(allAuthors).sort((a, b) => b[1] - a[1]).slice(0, 5),
     deletedFiles: dedupeByFile(deletedFiles),
-    addedFiles:   dedupeByFile(addedFiles),
+    addedFiles: dedupeByFile(addedFiles),
     mostChurned,
     biggestCommit,
     sentimentScore,
@@ -83,23 +92,23 @@ export async function collectGitData(repoPath, { since, limit = 500 } = {}) {
 
 function parseStatLog(raw) {
   const commits = []
-  const blocks  = raw.trim().split(/\n(?=[a-f0-9]{40}\|)/)
+  const blocks = raw.trim().split(/\n(?=[a-f0-9]{40}\|)/)
 
   for (const block of blocks) {
     const lines = block.trim().split('\n')
     if (!lines.length) continue
 
     const header = lines[0]
-    const parts  = header.split('|')
+    const parts = header.split('|')
     if (parts.length < 5) continue
 
     const [hash, author, , atStr, ...subjParts] = parts
     const subject = subjParts.join('|')
-    const ts      = parseInt(atStr, 10) * 1000
+    const ts = parseInt(atStr, 10) * 1000
 
     const files = []
     let insertions = 0
-    let deletions  = 0
+    let deletions = 0
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim()
@@ -111,14 +120,14 @@ function parseStatLog(raw) {
         const del = (plusminus.match(/-/g) ?? []).length
         files.push({ name: name.trim(), insertions: ins, deletions: del })
         insertions += ins
-        deletions  += del
+        deletions += del
         continue
       }
 
       const summaryLine = line.match(/(\d+) file.*?(\d+) insertion.*?(\d+) deletion/)
       if (summaryLine) {
         insertions = parseInt(summaryLine[2], 10)
-        deletions  = parseInt(summaryLine[3], 10)
+        deletions = parseInt(summaryLine[3], 10)
       }
     }
 
@@ -163,11 +172,11 @@ function isGenerated(filePath) {
 
 function scoreSentiment(commits) {
   const good = /fix|feat|add|improve|refactor|clean|perf|optim|update/i
-  const bad  = /revert|wip|hack|broken|temp|todo|debug|hotfix|emergency/i
-  let score  = 0
+  const bad = /revert|wip|hack|broken|temp|todo|debug|hotfix|emergency/i
+  let score = 0
   for (const c of commits) {
     if (good.test(c.subject)) score++
-    if (bad.test(c.subject))  score--
+    if (bad.test(c.subject)) score--
   }
   return Math.max(-1, Math.min(1, score / Math.max(commits.length, 1)))
 }
