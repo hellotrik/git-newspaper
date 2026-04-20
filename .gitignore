@@ -2,3 +2,4 @@ node_modules/
 *.html
 *.png
 !preview.png
+*.tgz
