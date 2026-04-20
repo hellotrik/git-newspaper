@@ -25,7 +25,7 @@
       "label": "git-newspaper: install",
       "identifier": "git-newspaper-install",
       "type": "shell",
-      "command": "npm install",
+      "command": "sudo npm install -g \"./$(node -e \"const p=require('./package.json'); process.stdout.write(p.name+'-'+p.version+'.tgz')\")\"",
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {}
@@ -37,8 +37,8 @@
         "focus": false
       },
       "icon": {
-        "id": "tools",
-        "tooltip": "安装项目依赖 (node_modules)"
+        "id": "rocket",
+        "tooltip": "全局安装本地包：npm install -g ./git-newspaper-<版本>.tgz（版本从 package.json 读取，需先执行 pack）"
       }
     }
   ]
